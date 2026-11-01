@@ -182,3 +182,51 @@ data class PagerDto(
     val perPage: Int? = null,
     val totalCount: Int? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class SubjectDetailResponseData(
+    val subject: SubjectDto? = null,
+    val stars: List<StaffDto>? = null,
+    val resource: ResourceContainerDto? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ResourceContainerDto(
+    val seasons: List<SeasonInfoDto>? = null,
+    val source: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SeasonInfoDto(
+    val se: Int? = null,
+    val maxEp: Int? = null,
+    val allEp: String? = null,
+    val resolutions: List<ResolutionInfoDto>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ResolutionInfoDto(
+    val resolution: Int? = null,
+    val epNum: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PlayResponseData(
+    val streams: List<VideoStreamItemDto>? = null,
+    val hls: List<VideoStreamItemDto>? = null,
+    val dash: List<VideoStreamItemDto>? = null,
+    val hasResource: Boolean? = null,
+    val limited: Boolean? = null,
+    val vipLocked: Boolean? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class VideoStreamItemDto(
+    val id: String? = null,
+    val url: String = "",
+    val resolutions: String? = null,
+    val format: String? = null,
+    val size: Long? = null,
+    val codecName: String? = null,
+    val playbackType: String? = null
+)

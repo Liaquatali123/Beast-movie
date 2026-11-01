@@ -138,6 +138,9 @@ fun VideoPlayerScreen(
     val coroutineScope = rememberCoroutineScope()
     val activity = context as? Activity
 
+    var activeStreamUrl by remember { mutableStateOf<String?>(null) }
+    var isResolvingStream by remember { mutableStateOf(true) }
+
     val mediaItem = remember(mediaId) { repository.getMediaItemById(mediaId) }
     val episode = remember(episodeId, mediaItem) {
         if (episodeId != null && mediaItem != null) {
@@ -145,16 +148,12 @@ fun VideoPlayerScreen(
         } else null
     }
 
-    val streamUrl = remember(mediaItem, episode) {
-        val s = episode?.streamUrl ?: mediaItem?.streamUrl ?: ""
-        s.ifBlank { "https://macdn.aoneroom.com/media/vone/2024/03/19/0391673747f71d3b6c88e047a10f67ac-sd.mp4" }
-    }
-
     val displayTitle = remember(mediaItem, episode) {
         if (episode != null) "${mediaItem?.title ?: "Beast Movies"}: ${episode.title}"
         else mediaItem?.title ?: "Beast Movies Player"
     }
 
+    var playerErrorMessage by remember { mutableStateOf<String?>(null) }
     var isPlaying by remember { mutableStateOf(true) }
     var currentPositionMs by remember { mutableLongStateOf(0L) }
     var totalDurationMs by remember { mutableLongStateOf(0L) }
@@ -162,7 +161,39 @@ fun VideoPlayerScreen(
     var areControlsVisible by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
     var isFullscreen by remember { mutableStateOf(false) }
-    var playerErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Resolve real authorized stream from /subject/play endpoint with validation
+    LaunchedEffect(mediaId, episodeId) {
+        isResolvingStream = true
+        val targetPath = episode?.detailPath ?: mediaItem?.detailPath ?: ""
+        val targetSe = episode?.seasonNumber ?: 0
+        val targetEp = episode?.episodeNumber ?: 0
+
+        val (resolvedUrl, playData) = repository.getPlayStreamData(
+            subjectId = mediaId,
+            season = targetSe,
+            episode = targetEp,
+            detailPath = targetPath
+        )
+
+        val fallbackUrl = episode?.streamUrl?.ifBlank { null }
+            ?: mediaItem?.streamUrl?.ifBlank { null }
+
+        val candidateUrl = resolvedUrl ?: fallbackUrl
+
+        when (val validation = com.example.data.validation.PlaybackValidationService.validatePlayback(mediaItem, playData, candidateUrl)) {
+            is com.example.data.validation.ValidationResult.Valid -> {
+                activeStreamUrl = validation.streamUrl
+                playerErrorMessage = null
+            }
+            is com.example.data.validation.ValidationResult.Invalid -> {
+                activeStreamUrl = null
+                playerErrorMessage = validation.reason
+            }
+        }
+
+        isResolvingStream = false
+    }
 
     // In-Player Settings Menu State
     var showInPlayerSettings by remember { mutableStateOf(false) }
@@ -181,22 +212,26 @@ fun VideoPlayerScreen(
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
 
     // Media3 ExoPlayer Instance
-    val exoPlayer = remember(streamUrl) {
+    val exoPlayer = remember(activeStreamUrl) {
         ExoPlayer.Builder(context).build().apply {
-            val item = MediaItem.fromUri(Uri.parse(streamUrl))
-            setMediaItem(item)
-            prepare()
-            playWhenReady = true
+            activeStreamUrl?.let { url ->
+                val item = MediaItem.fromUri(Uri.parse(url))
+                setMediaItem(item)
+                prepare()
+                playWhenReady = true
+            }
         }
     }
 
     // Restore saved watch position from Room DB
-    LaunchedEffect(mediaId) {
-        val saved = repository.getContinueWatchingItem(mediaId)
-        if (saved != null && saved.progressMs > 5000L) {
-            exoPlayer.seekTo(saved.progressMs)
+    LaunchedEffect(mediaId, activeStreamUrl) {
+        if (activeStreamUrl != null) {
+            val saved = repository.getContinueWatchingItem(mediaId)
+            if (saved != null && saved.progressMs > 5000L) {
+                exoPlayer.seekTo(saved.progressMs)
+            }
+            mediaItem?.let { repository.addToHistory(it) }
         }
-        mediaItem?.let { repository.addToHistory(it) }
     }
 
     // Back handler: exit fullscreen or navigate back
@@ -217,8 +252,18 @@ fun VideoPlayerScreen(
             override fun onPlaybackStateChanged(state: Int) {
                 isBuffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
-                    totalDurationMs = exoPlayer.duration.coerceAtLeast(0L)
-                    playerErrorMessage = null
+                    val dur = exoPlayer.duration.coerceAtLeast(0L)
+                    totalDurationMs = dur
+                    
+                    // Duration threshold check for Movies (min 600s / 10m)
+                    val isMovie = mediaItem?.type == com.example.data.model.MediaType.MOVIE
+                    val durationErr = com.example.data.validation.PlaybackValidationService.validateDuration(dur, isMovie)
+                    if (durationErr != null) {
+                        exoPlayer.pause()
+                        playerErrorMessage = durationErr
+                    } else {
+                        playerErrorMessage = null
+                    }
                 }
             }
 
@@ -420,17 +465,27 @@ fun VideoPlayerScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Buffering Indicator
-            if (isBuffering && playerErrorMessage == null) {
+            // Buffering or Resolving Indicator
+            if ((isBuffering || isResolvingStream) && playerErrorMessage == null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        color = BeastGoldPrimary,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(54.dp)
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = BeastGoldPrimary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(54.dp)
+                        )
+                        if (isResolvingStream) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Connecting to authorized stream...",
+                                color = Color.White,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
 

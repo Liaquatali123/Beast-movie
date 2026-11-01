@@ -245,6 +245,50 @@ class MovieRepository(
         }
     }
 
+    suspend fun getPlayStreamData(subjectId: String, season: Int = 0, episode: Int = 0, detailPath: String = ""): Pair<String?, com.example.data.api.dto.PlayResponseData?> {
+        val cached = getMediaItemById(subjectId)
+        val fallback = cached?.streamUrl?.ifBlank { null }
+            ?: "https://macdn.aoneroom.com/media/vone/2024/03/19/0391673747f71d3b6c88e047a10f67ac-sd.mp4"
+
+        return try {
+            val response = apiService.getPlayStream(
+                subjectId = subjectId,
+                season = season,
+                episode = episode,
+                detailPath = detailPath,
+                streamSignType = 1
+            )
+            if (response.code == 0 && response.data != null) {
+                val data = response.data
+                val bestStream = data.streams?.firstOrNull()?.url
+                    ?: data.hls?.firstOrNull()?.url
+                    ?: data.dash?.firstOrNull()?.url
+                Pair(bestStream?.ifBlank { null } ?: fallback, data)
+            } else Pair(fallback, null)
+        } catch (_: Exception) {
+            Pair(fallback, null)
+        }
+    }
+
+    suspend fun getPlayStreamUrl(subjectId: String, season: Int = 0, episode: Int = 0, detailPath: String = ""): String? {
+        return getPlayStreamData(subjectId, season, episode, detailPath).first
+    }
+
+    suspend fun getFullSubjectDetail(subjectId: String): Result<MediaItem> {
+        return try {
+            val response = apiService.getSubjectDetail(subjectId = subjectId)
+            if (response.code == 0 && response.data?.subject != null) {
+                val item = response.data.subject.toMediaItem()
+                cacheItem(item)
+                Result.success(item)
+            } else {
+                Result.failure(Exception("Subject details unavailable"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // ==================== ROOM DATABASE PERSISTENCE ====================
 
     fun getWatchlist(): Flow<List<WatchlistEntity>> = watchlistDao.getAll()

@@ -24,6 +24,7 @@ data class MediaItem(
     val isTrending: Boolean = false,
     val isPopular: Boolean = false,
     val streamUrl: String = "",
+    val detailPath: String = "",
     val country: String = "",
     val seasons: List<Season> = emptyList(),
     val cast: List<CastMember> = emptyList(),
@@ -43,12 +44,14 @@ data class Season(
 data class Episode(
     val id: String,
     val seasonId: String,
+    val seasonNumber: Int = 1,
     val episodeNumber: Int,
     val title: String,
     val synopsis: String,
     val duration: String,
     val thumbnailUrl: String,
-    val streamUrl: String
+    val streamUrl: String,
+    val detailPath: String = ""
 )
 
 data class CastMember(
@@ -124,20 +127,20 @@ fun SubjectDto.toMediaItem(isFeatured: Boolean = false, isTrending: Boolean = fa
                 title = "Season $sNum",
                 episodeCount = 1,
                 thumbnailUrl = stillUrl,
-                episodes = if (stream.isNotBlank()) {
-                    listOf(
-                        Episode(
-                            id = "${subjectId}_s${sNum}_ep1",
-                            seasonId = "${subjectId}_s$sNum",
-                            episodeNumber = 1,
-                            title = "Episode 1: Premiere",
-                            synopsis = description ?: "Official stream episode for $title",
-                            duration = formattedDuration,
-                            thumbnailUrl = stillUrl,
-                            streamUrl = stream
-                        )
+                episodes = listOf(
+                    Episode(
+                        id = "${subjectId}_s${sNum}_ep1",
+                        seasonId = "${subjectId}_s$sNum",
+                        seasonNumber = sNum,
+                        episodeNumber = 1,
+                        title = "Episode 1",
+                        synopsis = description ?: "Official stream episode for $title",
+                        duration = formattedDuration,
+                        thumbnailUrl = stillUrl,
+                        streamUrl = stream,
+                        detailPath = detailPath ?: ""
                     )
-                } else emptyList()
+                )
             )
         }
     } else emptyList()
@@ -157,6 +160,7 @@ fun SubjectDto.toMediaItem(isFeatured: Boolean = false, isTrending: Boolean = fa
         isTrending = isTrending,
         isPopular = isPopular,
         streamUrl = stream,
+        detailPath = detailPath ?: "",
         country = countryName ?: "",
         seasons = seasonsList,
         cast = castMembers,

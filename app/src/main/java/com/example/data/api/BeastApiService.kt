@@ -66,4 +66,20 @@ interface BeastApiService {
         @Query("tabId") tabId: String? = null,
         @Query("host") host: String = ApiConfig.host
     ): ApiResponse<HomeResponseData>
+
+    @GET("wefeed-h5api-bff/detail")
+    suspend fun getSubjectDetail(
+        @Query("subjectId") subjectId: String,
+        @Query("host") host: String = ApiConfig.host
+    ): ApiResponse<com.example.data.api.dto.SubjectDetailResponseData>
+
+    @GET("wefeed-h5api-bff/subject/play")
+    suspend fun getPlayStream(
+        @Query("subjectId") subjectId: String,
+        @Query("se") season: Int = 0,
+        @Query("ep") episode: Int = 0,
+        @Query("detailPath") detailPath: String = "",
+        @Query("streamSignType") streamSignType: Int = 1,
+        @Query("host") host: String = ApiConfig.host
+    ): ApiResponse<com.example.data.api.dto.PlayResponseData>
 }

@@ -225,12 +225,17 @@ class DetailsViewModel(
     val selectedSeason: StateFlow<Int> = _selectedSeason.asStateFlow()
 
     init {
-        loadRecommendations()
+        loadFullDetailsAndRecommendations()
     }
 
-    private fun loadRecommendations() {
+    private fun loadFullDetailsAndRecommendations() {
         viewModelScope.launch {
             _isLoading.value = true
+            // Load full subject detail from API
+            repository.getFullSubjectDetail(contentId).onSuccess { fullItem ->
+                _item.value = fullItem
+            }
+            // Load recommendations
             repository.getRecommendations(contentId).onSuccess { list ->
                 _similarItems.value = list
             }
