@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -69,7 +70,7 @@ fun MyListScreen(
     val continueWatching by viewModel.continueWatching.collectAsState()
     val context = LocalContext.current
 
-    val tabs = listOf("My List", "History", "Continue Watching")
+    val tabs = listOf("Watchlist", "History", "Continue Watching")
 
     Box(
         modifier = modifier
@@ -82,6 +83,7 @@ fun MyListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -156,7 +158,7 @@ fun MyListScreen(
 
             // Tab Content
             when (selectedTab) {
-                "My List" -> {
+                "Watchlist" -> {
                     if (watchlist.isEmpty()) {
                         EmptyListState("Your watchlist is empty.\nExplore and add titles you want to watch!")
                     } else {

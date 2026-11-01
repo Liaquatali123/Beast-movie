@@ -20,9 +20,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -52,6 +56,7 @@ import com.example.ui.theme.BeastSurface
 import com.example.ui.theme.BeastSurfaceVariant
 import com.example.ui.theme.BeastTextPrimary
 import com.example.ui.theme.BeastTextSecondary
+import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.HomeViewModel
 
 @Composable
@@ -63,10 +68,7 @@ fun HomeScreen(
     onSeeAllClick: (MediaType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val featured by viewModel.featuredItem.collectAsState()
-    val trendingMovies by viewModel.trendingMovies.collectAsState()
-    val popularSeries by viewModel.popularSeries.collectAsState()
-    val trendingAnime by viewModel.trendingAnime.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val continueWatchingList by viewModel.continueWatching.collectAsState()
     val showNotifications by viewModel.showNotifications.collectAsState()
 
@@ -83,205 +85,253 @@ fun HomeScreen(
                 onNotificationsClick = { viewModel.toggleNotifications(true) }
             )
 
-            // Scrollable Content Feed
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("home_content_list"),
-                contentPadding = PaddingValues(bottom = 90.dp)
-            ) {
-                // Featured Hero Banner
-                item {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        HeroFeaturedCard(
-                            item = featured,
-                            onWatchClick = { onWatchClick(featured.id) },
-                            onDetailsClick = { onMediaClick(featured.id) }
-                        )
+            when (val state = uiState) {
+                is HomeUiState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                color = BeastGoldPrimary,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading Beast Movies Catalog...",
+                                color = BeastTextSecondary,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
 
-                // Continue Watching (if available)
-                if (continueWatchingList.isNotEmpty()) {
-                    item {
-                        SectionHeader(title = "Continue Watching")
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                is HomeUiState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            items(continueWatchingList, key = { it.id }) { item ->
-                                ContinueWatchingCard(
-                                    item = item,
-                                    onClick = { onWatchClick(item.mediaId) }
-                                )
+                            Text(
+                                text = "Unable to load content",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Please check your network connection and tap Retry.",
+                                color = BeastTextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = { viewModel.loadHomeFeed() },
+                                colors = ButtonDefaults.buttonColors(containerColor = BeastGoldPrimary)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
-                // Trending Movies Section
-                item {
-                    SectionHeader(
-                        title = "Trending Movies",
-                        onSeeAllClick = { onSeeAllClick(MediaType.MOVIE) }
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                is HomeUiState.Success -> {
+                    val feed = state.data
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("home_content_list"),
+                        contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
-                        items(trendingMovies, key = { it.id }) { movie ->
-                            MediaCard(
-                                item = movie,
-                                onClick = { onMediaClick(movie.id) }
-                            )
+                        // Featured Hero Banner
+                        feed.featured?.let { feat ->
+                            item {
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    HeroFeaturedCard(
+                                        item = feat,
+                                        onWatchClick = { onWatchClick(feat.id) },
+                                        onDetailsClick = { onMediaClick(feat.id) }
+                                    )
+                                }
+                            }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
 
-                // Popular Series Section
-                item {
-                    SectionHeader(
-                        title = "Popular Series",
-                        onSeeAllClick = { onSeeAllClick(MediaType.SERIES) }
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(popularSeries, key = { it.id }) { series ->
-                            MediaCard(
-                                item = series,
-                                onClick = { onMediaClick(series.id) }
-                            )
+                        // Continue Watching Shelf
+                        if (continueWatchingList.isNotEmpty()) {
+                            item {
+                                SectionHeader(
+                                    title = "Continue Watching"
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                ) {
+                                    items(continueWatchingList, key = { it.id }) { item ->
+                                        ContinueWatchingCard(
+                                            item = item,
+                                            onClick = { onWatchClick(item.mediaId) }
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
 
-                // Trending Anime Section
-                item {
-                    SectionHeader(
-                        title = "Trending Anime",
-                        onSeeAllClick = { onSeeAllClick(MediaType.ANIME) }
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(trendingAnime, key = { it.id }) { anime ->
-                            MediaCard(
-                                item = anime,
-                                onClick = { onMediaClick(anime.id) }
+                        // Trending Movies Shelf
+                        if (feed.trendingMovies.isNotEmpty()) {
+                            item {
+                                SectionHeader(
+                                    title = "Trending Movies",
+                                    onSeeAllClick = { onSeeAllClick(MediaType.MOVIE) }
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    items(feed.trendingMovies, key = { it.id }) { movie ->
+                                        MediaCard(
+                                            item = movie,
+                                            onClick = { onMediaClick(movie.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Popular TV Series Shelf
+                        if (feed.popularSeries.isNotEmpty()) {
+                            item {
+                                SectionHeader(
+                                    title = "Popular Series",
+                                    onSeeAllClick = { onSeeAllClick(MediaType.SERIES) }
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    items(feed.popularSeries, key = { it.id }) { series ->
+                                        MediaCard(
+                                            item = series,
+                                            onClick = { onMediaClick(series.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Trending Anime Shelf
+                        if (feed.trendingAnime.isNotEmpty()) {
+                            item {
+                                SectionHeader(
+                                    title = "Trending Anime",
+                                    onSeeAllClick = { onSeeAllClick(MediaType.ANIME) }
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    items(feed.trendingAnime, key = { it.id }) { anime ->
+                                        MediaCard(
+                                            item = anime,
+                                            onClick = { onMediaClick(anime.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Additional Dynamic Sections from API
+                        val additionalSections = feed.sections.filter { sec ->
+                            val t = sec.title.lowercase()
+                            !t.contains("popular movie") && !t.contains("popular series") && !t.contains("animation") && sec.items.isNotEmpty()
+                        }.take(4)
+
+                        items(additionalSections) { section ->
+                            SectionHeader(
+                                title = section.title
                             )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            ) {
+                                items(section.items, key = { it.id }) { itm ->
+                                    MediaCard(
+                                        item = itm,
+                                        onClick = { onMediaClick(itm.id) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Notifications Modal Dialog
+        // Notification Dialog
         if (showNotifications) {
             AlertDialog(
                 onDismissRequest = { viewModel.toggleNotifications(false) },
                 containerColor = BeastSurface,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = BeastGoldBright,
+                        modifier = Modifier.size(32.dp)
+                    )
+                },
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = null,
-                                tint = BeastGoldBright,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Notifications",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                        }
-                        IconButton(onClick = { viewModel.toggleNotifications(false) }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = BeastTextSecondary
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Notifications",
+                        color = BeastTextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 },
                 text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        NotificationItem(
-                            title = "Dune: Part Two Available",
-                            subtitle = "Watch in 4K UHD with HDR and multi-language audio.",
-                            time = "Just now"
-                        )
-                        NotificationItem(
-                            title = "Breaking Bad Complete Series",
-                            subtitle = "All 5 seasons and 62 episodes ready to binge in HD.",
-                            time = "2 hours ago"
-                        )
-                        NotificationItem(
-                            title = "Welcome to Beast Movies!",
-                            subtitle = "Enjoy premium streaming, customize quality, and save titles to My List.",
-                            time = "1 day ago"
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = BeastSurfaceVariant),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Beast Movies Connected",
+                                    color = BeastGoldBright,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Connected to authorized API. Stream verified movies and TV series in HD.",
+                                    color = BeastTextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = { viewModel.toggleNotifications(false) }) {
-                        Text("Done", color = BeastGoldBright, fontWeight = FontWeight.Bold)
+                        Text("Dismiss", color = BeastGoldPrimary, fontWeight = FontWeight.Bold)
                     }
                 }
-            )
-        }
-    }
-}
-
-@Composable
-private fun NotificationItem(
-    title: String,
-    subtitle: String,
-    time: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = BeastSurfaceVariant),
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = time,
-                    color = BeastGoldPrimary,
-                    fontSize = 10.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                color = BeastTextSecondary,
-                fontSize = 12.sp,
-                lineHeight = 16.sp
             )
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Tab
@@ -75,28 +77,35 @@ import com.example.ui.viewmodel.DetailsViewModel
 fun SeriesDetailsScreen(
     viewModel: DetailsViewModel,
     onBackClick: () -> Unit,
-    onPlayClick: (String, String?) -> Unit, // mediaId, episodeId
+    onPlayClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
-    val item = viewModel.item ?: run {
+    val itemState by viewModel.item.collectAsState()
+    val isInWatchlist by viewModel.isInWatchlist.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+
+    val item = itemState
+    if (item == null) {
         Box(
-            modifier = modifier.fillMaxSize().background(BeastBackground),
+            modifier = modifier
+                .fillMaxSize()
+                .background(BeastBackground),
             contentAlignment = Alignment.Center
         ) {
-            Text("Series details not found", color = Color.White)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = BeastGoldBright, strokeWidth = 3.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Loading series details...", color = BeastTextSecondary, fontSize = 14.sp)
+            }
         }
         return
     }
 
-    val isInWatchlist by viewModel.isInWatchlist.collectAsState()
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val selectedSeasonNumber by viewModel.selectedSeason.collectAsState()
     var expandedSeasonId by remember { mutableStateOf<String?>(item.seasons.firstOrNull()?.id) }
-
-    val tabs = listOf("Seasons", "About")
+    val tabs = listOf("Episodes", "About")
 
     Box(
         modifier = modifier
@@ -106,13 +115,14 @@ fun SeriesDetailsScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 50.dp)
+            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            // Top App Bar
+            // Header Row
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -120,8 +130,9 @@ fun SeriesDetailsScreen(
                     IconButton(
                         onClick = onBackClick,
                         modifier = Modifier
-                            .size(42.dp)
-                            .testTag("series_details_back_btn")
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(BeastSurface)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -130,18 +141,14 @@ fun SeriesDetailsScreen(
                         )
                     }
 
-                    Text(
-                        text = "Series Details",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
                     IconButton(
                         onClick = {
-                            Toast.makeText(context, "Sharing ${item.title}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Link copied: ${item.title}", Toast.LENGTH_SHORT).show()
                         },
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(BeastSurface)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
@@ -152,220 +159,213 @@ fun SeriesDetailsScreen(
                 }
             }
 
-            // Series Poster & Meta Header Row
+            // Poster & Details Top Card
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    // Poster Card
                     AsyncImage(
                         model = item.posterUrl,
                         contentDescription = item.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(width = 115.dp, height = 165.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, BeastCardBorder, RoundedCornerShape(14.dp))
+                            .size(width = 110.dp, height = 165.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(BeastSurfaceVariant)
                     )
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // Title & Details
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = item.title,
                             color = Color.White,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            lineHeight = 26.sp
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = BeastRatingGold,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
+                            if (item.rating > 0.0) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = BeastRatingGold,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = String.format("%.1f", item.rating),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            if (item.releaseYear.isNotBlank()) {
+                                Text(
+                                    text = item.releaseYear,
+                                    color = BeastTextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = item.runtime,
+                            color = BeastGoldBright,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (item.genres.isNotEmpty()) {
                             Text(
-                                text = "%.1f".format(item.rating),
-                                color = BeastRatingGold,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = BeastRatingGold,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = " (${item.releaseYear}) • ${item.runtime}",
+                                text = item.genres.take(3).joinToString(" • "),
                                 color = BeastTextSecondary,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Genre tags
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            item.genres.take(3).forEach { genre ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(BeastSurfaceVariant)
-                                        .border(1.dp, BeastCardBorder, RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = genre,
-                                        color = BeastTextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
                     }
+                }
+            }
+
+            // Actions: Play Series & Bookmark
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val firstEp = item.seasons.firstOrNull()?.episodes?.firstOrNull()
+                    GoldButton(
+                        text = "Play Series",
+                        icon = Icons.Default.PlayArrow,
+                        onClick = { onPlayClick(item.id, firstEp?.id) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedActionPill(
+                        text = if (isInWatchlist) "Saved" else "+ My List",
+                        icon = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
+                        isSelected = isInWatchlist,
+                        onClick = { viewModel.toggleWatchlist() },
+                        modifier = Modifier.weight(0.7f)
+                    )
                 }
             }
 
             // Synopsis
-            item {
-                Text(
-                    text = item.synopsis,
-                    color = Color(0xFFD4D4D8),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                )
-            }
-
-            // Action Buttons
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    GoldButton(
-                        text = "Play Series",
-                        onClick = {
-                            val firstEp = item.seasons.firstOrNull()?.episodes?.firstOrNull()
-                            onPlayClick(item.id, firstEp?.id)
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedActionPill(
-                        text = if (isInWatchlist) "In My List" else "+ Add to List",
-                        icon = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
-                        isSelected = isInWatchlist,
-                        onClick = {
-                            viewModel.toggleWatchlist()
-                            val msg = if (!isInWatchlist) "Added to My List" else "Removed from My List"
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            if (item.synopsis.isNotBlank()) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        Text(
+                            text = "Synopsis",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = item.synopsis,
+                            color = BeastTextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp
+                        )
+                    }
                 }
             }
 
-            // Tab Selector: Seasons | About
+            // Tabs Row
             item {
                 Spacer(modifier = Modifier.height(10.dp))
                 TabRow(
                     selectedTabIndex = tabs.indexOf(selectedTab).coerceAtLeast(0),
-                    containerColor = Color.Transparent,
+                    containerColor = BeastBackground,
                     contentColor = BeastGoldBright,
-                    divider = {},
                     indicator = { tabPositions ->
                         val index = tabs.indexOf(selectedTab).coerceAtLeast(0)
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[index]),
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
                             color = BeastGoldBright,
-                            height = 3.dp
+                            height = 2.dp
                         )
                     },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
-                    tabs.forEach { tabName ->
-                        val isSelected = tabName == selectedTab
+                    tabs.forEach { tabTitle ->
                         Tab(
-                            selected = isSelected,
-                            onClick = { viewModel.selectTab(tabName) },
+                            selected = selectedTab == tabTitle,
+                            onClick = { viewModel.selectTab(tabTitle) },
                             text = {
                                 Text(
-                                    text = tabName,
-                                    color = if (isSelected) Color.White else BeastTextSecondary,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    text = tabTitle,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selectedTab == tabTitle) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab == tabTitle) Color.White else BeastTextSecondary
                                 )
                             }
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // Content of selected tab
-            if (selectedTab == "Seasons") {
-                if (item.seasons.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No season data available yet.",
-                            color = BeastTextSecondary,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-                } else {
-                    items(item.seasons, key = { it.id }) { season ->
-                        val isExpanded = expandedSeasonId == season.id
-                        SeasonCard(
-                            season = season,
-                            isExpanded = isExpanded,
-                            onToggleExpand = {
-                                expandedSeasonId = if (isExpanded) null else season.id
-                            },
-                            onEpisodePlay = { ep ->
-                                onPlayClick(item.id, ep.id)
-                            }
-                        )
+            // Tab Content
+            when (selectedTab) {
+                "Episodes" -> {
+                    if (item.seasons.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Episodes currently being synchronized from source.",
+                                color = BeastTextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            )
+                        }
+                    } else {
+                        items(item.seasons) { season ->
+                            SeasonAccordionCard(
+                                season = season,
+                                isExpanded = expandedSeasonId == season.id,
+                                onToggle = {
+                                    expandedSeasonId = if (expandedSeasonId == season.id) null else season.id
+                                },
+                                onEpisodePlay = { ep ->
+                                    onPlayClick(item.id, ep.id)
+                                }
+                            )
+                        }
                     }
                 }
-            } else {
-                // About Tab
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Text(text = "About ${item.title}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(text = item.synopsis, color = BeastTextSecondary, fontSize = 13.sp, lineHeight = 20.sp)
 
-                        Text(text = "Cast & Crew", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        item.cast.forEach { actor ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(
-                                    model = actor.photoUrl,
-                                    contentDescription = actor.name,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(BeastSurfaceVariant)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(text = actor.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(text = actor.role, color = BeastTextSecondary, fontSize = 11.sp)
-                                }
-                            }
+                "About" -> {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Text(
+                                text = "Series Information",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Category: ${item.type.displayName}\nSeasons: ${item.seasons.size.coerceAtLeast(1)}\nSource: Verified Streaming Endpoint",
+                                color = BeastTextSecondary,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
                         }
                     }
                 }
@@ -375,51 +375,38 @@ fun SeriesDetailsScreen(
 }
 
 @Composable
-private fun SeasonCard(
+private fun SeasonAccordionCard(
     season: Season,
     isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
+    onToggle: () -> Unit,
     onEpisodePlay: (Episode) -> Unit
 ) {
     Card(
+        colors = CardDefaults.cardColors(containerColor = BeastSurface),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BeastCardBorder),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .testTag("season_card_${season.id}"),
-        colors = CardDefaults.cardColors(containerColor = BeastSurface),
-        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onToggleExpand() }
-                    .padding(10.dp),
+                    .clickable(onClick = onToggle)
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Season Thumbnail
-                AsyncImage(
-                    model = season.thumbnailUrl,
-                    contentDescription = season.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 80.dp, height = 55.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(BeastSurfaceVariant)
-                )
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
                         text = season.title,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${season.episodeCount} Episodes",
+                        text = "${season.episodes.size} Episodes",
                         color = BeastTextSecondary,
                         fontSize = 12.sp
                     )
@@ -428,33 +415,18 @@ private fun SeasonCard(
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = BeastGoldBright,
-                    modifier = Modifier.size(24.dp)
+                    tint = BeastGoldBright
                 )
             }
 
-            // Expanded Episodes List
             if (isExpanded) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (season.episodes.isEmpty()) {
-                        Text(
-                            text = "Episodes loading soon...",
-                            color = BeastTextSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(8.dp)
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    season.episodes.forEach { episode ->
+                        EpisodeItemRow(
+                            episode = episode,
+                            onPlay = { onEpisodePlay(episode) }
                         )
-                    } else {
-                        season.episodes.forEach { episode ->
-                            EpisodeRow(
-                                episode = episode,
-                                onPlay = { onEpisodePlay(episode) }
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
@@ -463,7 +435,7 @@ private fun SeasonCard(
 }
 
 @Composable
-private fun EpisodeRow(
+private fun EpisodeItemRow(
     episode: Episode,
     onPlay: () -> Unit
 ) {
@@ -472,54 +444,50 @@ private fun EpisodeRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(BeastSurfaceVariant)
-            .clickable { onPlay() }
-            .padding(8.dp)
-            .testTag("episode_${episode.id}"),
+            .clickable(onClick = onPlay)
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
+        AsyncImage(
+            model = episode.thumbnailUrl,
+            contentDescription = episode.title,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(width = 72.dp, height = 48.dp)
+                .size(width = 70.dp, height = 48.dp)
                 .clip(RoundedCornerShape(6.dp))
-        ) {
-            AsyncImage(
-                model = episode.thumbnailUrl,
-                contentDescription = episode.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0x50000000)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = BeastGoldBright,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
+                .background(Color.Black)
+        )
 
         Spacer(modifier = Modifier.width(10.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${episode.episodeNumber}. ${episode.title}",
+                text = episode.title,
                 color = Color.White,
-                fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = episode.duration,
-                color = BeastGoldBright,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
+                color = BeastTextSecondary,
+                fontSize = 11.sp
+            )
+        }
+
+        IconButton(
+            onClick = onPlay,
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(BeastGoldBright)
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Play Episode",
+                tint = Color.Black,
+                modifier = Modifier.size(20.dp)
             )
         }
     }

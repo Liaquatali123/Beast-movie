@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,11 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Tab
@@ -78,19 +78,28 @@ fun MovieDetailsScreen(
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
-    val item = viewModel.item ?: run {
+    val itemState by viewModel.item.collectAsState()
+    val similarItems by viewModel.similarItems.collectAsState()
+    val isInWatchlist by viewModel.isInWatchlist.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+    val tabs = listOf("Similar", "Cast", "About")
+
+    val item = itemState
+    if (item == null) {
         Box(
-            modifier = modifier.fillMaxSize().background(BeastBackground),
+            modifier = modifier
+                .fillMaxSize()
+                .background(BeastBackground),
             contentAlignment = Alignment.Center
         ) {
-            Text("Movie details not found", color = Color.White)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = BeastGoldBright, strokeWidth = 3.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Loading title...", color = BeastTextSecondary, fontSize = 14.sp)
+            }
         }
         return
     }
-
-    val isInWatchlist by viewModel.isInWatchlist.collectAsState()
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val tabs = listOf("Similar", "Cast", "Reviews")
 
     Box(
         modifier = modifier
@@ -100,9 +109,9 @@ fun MovieDetailsScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 40.dp)
+            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            // Backdrop with gradient
+            // Backdrop with gradient scrim
             item {
                 Box(
                     modifier = Modifier
@@ -110,33 +119,34 @@ fun MovieDetailsScreen(
                         .height(300.dp)
                 ) {
                     AsyncImage(
-                        model = item.backdropUrl.ifEmpty { item.posterUrl },
+                        model = item.backdropUrl.ifBlank { item.posterUrl },
                         contentDescription = item.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // Gradient overlay
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(DetailsBackdropGradient)
                     )
 
-                    // Top Floating Buttons: Back and Share
+                    // Top navigation row
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 36.dp),
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
                             onClick = onBackClick,
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x80000000))
-                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
-                                .testTag("details_back_btn")
+                                .background(Color.Black.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -147,13 +157,12 @@ fun MovieDetailsScreen(
 
                         IconButton(
                             onClick = {
-                                Toast.makeText(context, "Sharing link to ${item.title}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Link copied: ${item.title}", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x80000000))
-                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                .background(Color.Black.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
@@ -165,247 +174,283 @@ fun MovieDetailsScreen(
                 }
             }
 
-            // Title, Rating, Meta
+            // Title and Metadata
             item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
                     Text(
                         text = item.title,
                         color = Color.White,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Meta: ★ rating ★ (year) • runtime • age rating
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = BeastRatingGold,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
+                    // Meta chips row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (item.rating > 0.0) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(BeastSurfaceVariant)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = BeastRatingGold,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = String.format("%.1f", item.rating),
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (item.releaseYear.isNotBlank()) {
+                            Text(
+                                text = item.releaseYear,
+                                color = BeastTextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+
                         Text(
-                            text = "%.1f".format(item.rating),
-                            color = BeastRatingGold,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            text = "•",
+                            color = BeastTextSecondary,
+                            fontSize = 12.sp
                         )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = BeastRatingGold,
-                            modifier = Modifier.size(16.dp)
-                        )
+
                         Text(
-                            text = "  (${item.releaseYear}) • ${item.runtime} • ${item.ageRating}",
+                            text = item.runtime,
                             color = BeastTextSecondary,
                             fontSize = 13.sp
                         )
+
+                        if (item.country.isNotBlank()) {
+                            Text(
+                                text = "•",
+                                color = BeastTextSecondary,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = item.country,
+                                color = BeastTextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Genre Pills
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item.genres.take(4).forEach { genre ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(BeastSurfaceVariant)
-                                    .border(1.dp, BeastCardBorder, RoundedCornerShape(16.dp))
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = genre,
-                                    color = BeastTextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                    if (item.genres.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(bottom = 14.dp)
+                        ) {
+                            item.genres.take(4).forEach { g ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(BeastSurface)
+                                        .border(1.dp, BeastCardBorder, RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(text = g, color = BeastTextSecondary, fontSize = 11.sp)
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Synopsis
-                    Text(
-                        text = item.synopsis,
-                        color = Color(0xFFD4D4D8),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Primary Gold "Watch Now" Button
-                    GoldButton(
-                        text = "Watch Now",
-                        onClick = { onPlayClick(item.id) }
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Secondary Action Buttons Row: Add to List, Download
+                    // Action Buttons Row: Watch Now (Gold) & Add to List
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 18.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedActionPill(
-                            text = if (isInWatchlist) "In My List" else "Add to List",
-                            icon = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
-                            isSelected = isInWatchlist,
-                            onClick = {
-                                viewModel.toggleWatchlist()
-                                val msg = if (!isInWatchlist) "Added to My List" else "Removed from My List"
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            },
+                        GoldButton(
+                            text = "Watch Now",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = { onPlayClick(item.id) },
                             modifier = Modifier.weight(1f)
                         )
 
                         OutlinedActionPill(
-                            text = "Download",
-                            icon = Icons.Default.Download,
-                            onClick = {
-                                Toast.makeText(context, "Downloading ${item.title} (1080p)", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
+                            text = if (isInWatchlist) "Added" else "+ My List",
+                            icon = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
+                            isSelected = isInWatchlist,
+                            onClick = { viewModel.toggleWatchlist() },
+                            modifier = Modifier.weight(0.7f)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    // Synopsis / Overview
+                    if (item.synopsis.isNotBlank()) {
+                        Text(
+                            text = "Overview",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Text(
+                            text = item.synopsis,
+                            color = BeastTextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(bottom = 20.dp)
+                        )
+                    }
                 }
             }
 
-            // Tabs Row: Similar, Cast, Reviews
+            // Tabs Row
             item {
                 TabRow(
                     selectedTabIndex = tabs.indexOf(selectedTab).coerceAtLeast(0),
-                    containerColor = Color.Transparent,
+                    containerColor = BeastBackground,
                     contentColor = BeastGoldBright,
-                    divider = {},
                     indicator = { tabPositions ->
                         val index = tabs.indexOf(selectedTab).coerceAtLeast(0)
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[index]),
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
                             color = BeastGoldBright,
-                            height = 3.dp
+                            height = 2.dp
                         )
                     },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
-                    tabs.forEach { tabName ->
-                        val isSelected = tabName == selectedTab
+                    tabs.forEach { tabTitle ->
                         Tab(
-                            selected = isSelected,
-                            onClick = { viewModel.selectTab(tabName) },
+                            selected = selectedTab == tabTitle,
+                            onClick = { viewModel.selectTab(tabTitle) },
                             text = {
                                 Text(
-                                    text = tabName,
-                                    color = if (isSelected) Color.White else BeastTextSecondary,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    text = tabTitle,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selectedTab == tabTitle) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab == tabTitle) Color.White else BeastTextSecondary
                                 )
                             }
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
             // Tab Content
             when (selectedTab) {
                 "Similar" -> {
-                    item {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(viewModel.similarItems, key = { it.id }) { similar ->
-                                MediaCard(
-                                    item = similar,
-                                    onClick = { onMediaClick(similar.id) },
-                                    width = 115,
-                                    height = 165
-                                )
+                    if (similarItems.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Discovering recommended titles...",
+                                color = BeastTextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    } else {
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(similarItems, key = { it.id }) { sim ->
+                                    MediaCard(
+                                        item = sim,
+                                        onClick = { onMediaClick(sim.id) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
                 "Cast" -> {
                     if (item.cast.isEmpty()) {
                         item {
                             Text(
-                                text = "Cast information unavailable",
+                                text = "Cast information from verified source is being updated.",
                                 color = BeastTextSecondary,
+                                fontSize = 13.sp,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
                     } else {
-                        items(item.cast, key = { it.id }) { actor ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                AsyncImage(
-                                    model = actor.photoUrl,
-                                    contentDescription = actor.name,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .clip(CircleShape)
-                                        .background(BeastSurfaceVariant)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(text = actor.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text(text = actor.role, color = BeastTextSecondary, fontSize = 12.sp)
+                                items(item.cast, key = { it.id }) { actor ->
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.width(80.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = actor.photoUrl.ifBlank { item.posterUrl },
+                                            contentDescription = actor.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .clip(CircleShape)
+                                                .background(BeastSurface)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = actor.name,
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = actor.role,
+                                            color = BeastTextSecondary,
+                                            fontSize = 10.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                "Reviews" -> {
-                    if (item.reviews.isEmpty()) {
-                        item {
+
+                "About" -> {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Text(
-                                text = "No reviews yet. Be the first to review!",
-                                color = BeastTextSecondary,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                text = "Streaming Info",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                        }
-                    } else {
-                        items(item.reviews, key = { it.id }) { review ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                colors = CardDefaults.cardColors(containerColor = BeastSurface),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(text = review.author, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = BeastRatingGold, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(2.dp))
-                                            Text(text = "%.1f".format(review.rating), color = BeastRatingGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Text(text = review.date, color = BeastTextSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
-                                    Text(text = review.content, color = Color(0xFFD4D4D8), fontSize = 13.sp, lineHeight = 18.sp)
-                                }
-                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Source: Authorized Media CDN (macdn.aoneroom.com)\nFormat: High-Definition MP4/HLS\nCategory: ${item.type.displayName}",
+                                color = BeastTextSecondary,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
                         }
                     }
                 }

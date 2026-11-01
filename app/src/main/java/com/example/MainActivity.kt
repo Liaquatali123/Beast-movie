@@ -105,7 +105,7 @@ fun BeastMoviesApp(
     }
 
     fun openDetails(contentId: String) {
-        val item = repository.getById(contentId)
+        val item = repository.getMediaItemById(contentId)
         if (item?.type == MediaType.SERIES || item?.type == MediaType.ANIME) {
             navigateTo(Screen.SeriesDetails(contentId))
         } else {
