@@ -1,85 +1,62 @@
 package com.example.data.api
 
-import com.example.data.api.dto.ApiResponse
-import com.example.data.api.dto.DetailRecResponseData
-import com.example.data.api.dto.EveryoneSearchResponseData
-import com.example.data.api.dto.FilterRequest
-import com.example.data.api.dto.FilterResponseData
-import com.example.data.api.dto.HomeResponseData
-import com.example.data.api.dto.SearchRequest
-import com.example.data.api.dto.SearchResponseData
-import com.example.data.api.dto.SearchSuggestRequest
-import com.example.data.api.dto.SearchSuggestResponseData
-import com.example.data.api.dto.TrendingResponseData
-import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
+/**
+ * StreamX is a public, keyless metadata API.
+ * It does not expose movie/episode video streams or a playback resolver.
+ */
 interface BeastApiService {
+    @GET("health")
+    suspend fun health(): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/home")
-    suspend fun getHome(
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<HomeResponseData>
+    @GET("catalog/{type}/{catalog}")
+    suspend fun catalog(
+        @Path("type") type: String,
+        @Path("catalog") catalog: String = "top",
+        @Query("genre") genre: String? = null,
+        @Query("skip") skip: Int = 0,
+        @Query("search") search: String? = null
+    ): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/subject/trending")
-    suspend fun getTrending(
-        @Query("page") page: Int = 1,
-        @Query("perPage") perPage: Int = 18,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<TrendingResponseData>
-
-    @GET("wefeed-h5api-bff/subject/everyone-search")
-    suspend fun getEveryoneSearch(
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<EveryoneSearchResponseData>
-
-    @POST("wefeed-h5api-bff/subject/search")
+    @GET("search")
     suspend fun search(
-        @Body request: SearchRequest,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<SearchResponseData>
+        @Query("q") query: String,
+        @Query("type") type: String,
+        @Query("skip") skip: Int = 0
+    ): Map<String, Any?>
 
-    @POST("wefeed-h5api-bff/subject/filter")
-    suspend fun filter(
-        @Body request: FilterRequest,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<FilterResponseData>
+    @GET("anime/search")
+    suspend fun searchAnime(@Query("q") query: String): Map<String, Any?>
 
-    @POST("wefeed-h5api-bff/subject/search-suggest")
-    suspend fun searchSuggest(
-        @Body request: SearchSuggestRequest,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<SearchSuggestResponseData>
+    @GET("imdb/search")
+    suspend fun searchImdb(@Query("q") query: String): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/subject/detail-rec")
-    suspend fun getDetailRecommendations(
-        @Query("subjectId") subjectId: String,
-        @Query("page") page: Int = 1,
-        @Query("perPage") perPage: Int = 12,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<DetailRecResponseData>
+    @GET("meta/{type}/{id}")
+    suspend fun metadata(
+        @Path("type") type: String,
+        @Path("id") id: String,
+        @Query("enrich") enrich: Int = 1
+    ): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/tab-operating")
-    suspend fun getTabOperating(
-        @Query("tabId") tabId: String? = null,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<HomeResponseData>
+    @GET("similar/{type}/{id}")
+    suspend fun similar(
+        @Path("type") type: String,
+        @Path("id") id: String
+    ): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/detail")
-    suspend fun getSubjectDetail(
-        @Query("subjectId") subjectId: String,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<com.example.data.api.dto.SubjectDetailResponseData>
+    @GET("trending/{type}")
+    suspend fun trending(
+        @Path("type") type: String,
+        @Query("limit") limit: Int = 20
+    ): Map<String, Any?>
 
-    @GET("wefeed-h5api-bff/subject/play")
-    suspend fun getPlayStream(
-        @Query("subjectId") subjectId: String,
-        @Query("se") season: Int = 0,
-        @Query("ep") episode: Int = 0,
-        @Query("detailPath") detailPath: String = "",
-        @Query("streamSignType") streamSignType: Int = 1,
-        @Query("host") host: String = ApiConfig.host
-    ): ApiResponse<com.example.data.api.dto.PlayResponseData>
+    @GET("streaming/{type}/{id}")
+    suspend fun streaming(
+        @Path("type") type: String,
+        @Path("id") id: String,
+        @Query("country") country: String = "PK"
+    ): Map<String, Any?>
 }
