@@ -9,40 +9,22 @@ sealed class ValidationResult {
 }
 
 object PlaybackValidationService {
-
-    /**
-     * Validates playback data before opening player.
-     * Permissive and robust to ensure requested streams play successfully.
-     */
     fun validatePlayback(
         mediaItem: MediaItem?,
         playData: PlayResponseData?,
         streamUrl: String?
     ): ValidationResult {
-        if (!streamUrl.isNullOrBlank()) {
-            return ValidationResult.Valid(streamUrl)
-        }
+        val candidate = streamUrl?.takeIf { it.isNotBlank() }
+            ?: playData?.streams?.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+            ?: playData?.hls?.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+            ?: playData?.dash?.firstOrNull()?.url?.takeIf { it.isNotBlank() }
 
-        // If direct streamUrl is blank, check if playData has streams
-        if (playData != null) {
-            val best = playData.streams?.firstOrNull()?.url
-                ?: playData.hls?.firstOrNull()?.url
-                ?: playData.dash?.firstOrNull()?.url
-            if (!best.isNullOrBlank()) {
-                return ValidationResult.Valid(best)
-            }
+        return if (candidate == null) {
+            ValidationResult.Invalid("StreamX provides movie information and legal watch links, not video files. Connect an authorized video source to play this title.")
+        } else {
+            ValidationResult.Valid(candidate)
         }
-
-        return ValidationResult.Invalid("No playable stream source available for this title.")
     }
 
-    /**
-     * Validates stream duration. Allows short clips when requested.
-     */
-    fun validateDuration(
-        durationMs: Long,
-        isMovie: Boolean
-    ): String? {
-        return null
-    }
+    fun validateDuration(durationMs: Long, isMovie: Boolean): String? = null
 }
