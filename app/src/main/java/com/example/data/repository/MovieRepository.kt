@@ -56,9 +56,15 @@ class MovieRepository(
 
     suspend fun getHomeFeed(): Result<HomeFeedData> = try {
         val (movies, series, anime) = coroutineScope {
-            val movieCall = async { runCatching { apiService.trending("movie", 20) }.getOrElse { loadCatalog("movie") } }
-            val seriesCall = async { runCatching { apiService.trending("series", 20) }.getOrElse { loadCatalog("series") } }
-            val animeCall = async { runCatching { apiService.searchAnime("popular anime") }.getOrDefault(emptyMap()) }
+            val movieCall = async {
+                try { apiService.trending("movie", 20) } catch (_: Exception) { apiService.catalog("movie", "top") }
+            }
+            val seriesCall = async {
+                try { apiService.trending("series", 20) } catch (_: Exception) { apiService.catalog("series", "top") }
+            }
+            val animeCall = async {
+                try { apiService.searchAnime("popular anime") } catch (_: Exception) { emptyMap<String, Any?>() }
+            }
             Triple(movieCall.await(), seriesCall.await(), animeCall.await())
         }
         val movieItems = mapItems(movies, MediaType.MOVIE)
@@ -96,9 +102,15 @@ class MovieRepository(
     suspend fun search(query: String, page: Int = 1, perPage: Int = 24): Result<List<MediaItem>> = try {
         val skip = ((page - 1).coerceAtLeast(0)) * perPage
         val results = coroutineScope {
-            val movies = async { runCatching { apiService.search(query, "movie", skip) }.getOrDefault(emptyMap()) }
-            val series = async { runCatching { apiService.search(query, "series", skip) }.getOrDefault(emptyMap()) }
-            val anime = async { runCatching { apiService.searchAnime(query) }.getOrDefault(emptyMap()) }
+            val movies = async {
+                try { apiService.search(query, "movie", skip) } catch (_: Exception) { emptyMap<String, Any?>() }
+            }
+            val series = async {
+                try { apiService.search(query, "series", skip) } catch (_: Exception) { emptyMap<String, Any?>() }
+            }
+            val anime = async {
+                try { apiService.searchAnime(query) } catch (_: Exception) { emptyMap<String, Any?>() }
+            }
             Triple(movies.await(), series.await(), anime.await())
         }
         val items = (mapItems(results.first, MediaType.MOVIE) +
