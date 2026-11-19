@@ -71,8 +71,17 @@ fun Map<String, Any?>.toMediaItem(defaultType: MediaType? = null): MediaItem {
     val images = this["images"].asMap()
     val posterSet = images["poster"].asMap()
     val backgroundSet = images["background"].asMap()
+    val coverSet = this["coverImage"].asMap()
+    val bannerSet = this["bannerImage"].asMap()
+    val titleObject = this["title"].asMap()
     val idValue = text("imdb_id").ifBlank { text("id") }.ifBlank { text("imdbId") }
-    val titleValue = text("name").ifBlank { text("title") }.ifBlank { "Untitled" }
+    val titleValue = text("name").ifBlank {
+        titleObject["userPreferred"]?.toString()
+            ?: titleObject["english"]?.toString()
+            ?: titleObject["romaji"]?.toString()
+            ?: this["title"]?.toString()
+            ?: ""
+    }.ifBlank { "Untitled" }
     val rawType = text("type").lowercase()
     val mediaType = when {
         rawType == "series" || rawType == "tv" || rawType == "show" -> MediaType.SERIES
@@ -82,9 +91,12 @@ fun Map<String, Any?>.toMediaItem(defaultType: MediaType? = null): MediaItem {
     }
     val poster = posterSet["medium"]?.toString()
         ?: posterSet["large"]?.toString()
+        ?: coverSet["large"]?.toString()
+        ?: coverSet["medium"]?.toString()
         ?: text("poster")
     val backdrop = backgroundSet["medium"]?.toString()
         ?: backgroundSet["large"]?.toString()
+        ?: bannerSet["large"]?.toString()
         ?: text("background")
     val rating = number("imdbRating") ?: number("rating") ?: 0.0
     val year = text("year").ifBlank { text("releaseInfo").take(4) }
