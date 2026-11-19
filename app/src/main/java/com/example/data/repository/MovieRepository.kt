@@ -149,16 +149,19 @@ class MovieRepository(
     suspend fun getFullSubjectDetail(subjectId: String): Result<MediaItem> = try {
         val cached = getMediaItemById(subjectId)
         // StreamX currently exposes anime search only, not a dedicated anime detail route.
-        if (cached?.type == MediaType.ANIME) return Result.success(cached)
-        val type = if (cached?.type == MediaType.SERIES) "series" else "movie"
-        val response = apiService.metadata(type, subjectId)
-        if (response["ok"] == false) throw IllegalStateException(response["error"]?.toString() ?: "Metadata unavailable")
-        val meta = (response["meta"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
-            ?: throw IllegalStateException("StreamX returned no metadata")
-        val item = meta.toMediaItem(cached?.type)
-        if (item.id.isBlank()) throw IllegalStateException("Invalid media identifier")
-        cacheItem(item)
-        Result.success(item)
+        if (cached?.type == MediaType.ANIME) {
+            Result.success(cached)
+        } else {
+            val type = if (cached?.type == MediaType.SERIES) "series" else "movie"
+            val response = apiService.metadata(type, subjectId)
+            if (response["ok"] == false) throw IllegalStateException(response["error"]?.toString() ?: "Metadata unavailable")
+            val meta = (response["meta"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+                ?: throw IllegalStateException("StreamX returned no metadata")
+            val item = meta.toMediaItem(cached?.type)
+            if (item.id.isBlank()) throw IllegalStateException("Invalid media identifier")
+            cacheItem(item)
+            Result.success(item)
+        }
     } catch (e: Exception) { Result.failure(e) }
 
     // Local Room persistence — independent of the remote metadata provider.
