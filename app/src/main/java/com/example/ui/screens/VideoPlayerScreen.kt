@@ -162,7 +162,7 @@ fun VideoPlayerScreen(
     var isLocked by remember { mutableStateOf(false) }
     var isFullscreen by remember { mutableStateOf(false) }
 
-    // Resolve real authorized stream from /subject/play endpoint with validation
+    // StreamX supplies metadata only; playback requires a separately authorized video source.
     LaunchedEffect(mediaId, episodeId) {
         isResolvingStream = true
         val targetPath = episode?.detailPath ?: mediaItem?.detailPath ?: ""
