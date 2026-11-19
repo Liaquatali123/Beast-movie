@@ -122,8 +122,13 @@ class MovieRepository(
     } catch (e: Exception) { Result.success(Pair(emptyList(), emptyList())) }
 
     suspend fun getRecommendations(subjectId: String): Result<List<MediaItem>> = try {
-        val type = getMediaItemById(subjectId)?.type?.let { if (it == MediaType.SERIES) "series" else "movie" } ?: "movie"
-        Result.success(mapItems(apiService.similar(type, subjectId)))
+        val mediaType = getMediaItemById(subjectId)?.type
+        if (mediaType == MediaType.ANIME) {
+            Result.success(emptyList())
+        } else {
+            val type = if (mediaType == MediaType.SERIES) "series" else "movie"
+            Result.success(mapItems(apiService.similar(type, subjectId)))
+        }
     } catch (e: Exception) { Result.success(emptyList()) }
 
     /** StreamX has no playback resolver. Never substitute a trailer or hard-coded sample video. */
@@ -143,7 +148,9 @@ class MovieRepository(
 
     suspend fun getFullSubjectDetail(subjectId: String): Result<MediaItem> = try {
         val cached = getMediaItemById(subjectId)
-        val type = if (cached?.type == MediaType.SERIES || cached?.type == MediaType.ANIME) "series" else "movie"
+        // StreamX currently exposes anime search only, not a dedicated anime detail route.
+        if (cached?.type == MediaType.ANIME) return Result.success(cached)
+        val type = if (cached?.type == MediaType.SERIES) "series" else "movie"
         val response = apiService.metadata(type, subjectId)
         if (response["ok"] == false) throw IllegalStateException(response["error"]?.toString() ?: "Metadata unavailable")
         val meta = (response["meta"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
